@@ -1,0 +1,5 @@
+# Игнорируемые файлы
+node_modules/
+*.log
+*.mp4
+.env
