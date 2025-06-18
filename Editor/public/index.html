@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VideoEditor</title>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <!-- noUiSlider CSS -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css"/>
+  <style>
+    /* Подключаем шрифты для preview */
+    @font-face { font-family:'Arial';           src:url('/fonts/Arial.ttf')         format('truetype'); }
+    @font-face { font-family:'Roboto';          src:url('/fonts/Roboto.ttf')        format('truetype'); }
+    @font-face { font-family:'Times New Roman'; src:url('/fonts/TimesNewRoman.ttf') format('truetype'); }
+
+    body {
+      overflow:hidden;
+      background:#3c3c3c;
+      height:100vh;
+    }
+    .navbar-brand img { width:10%; }
+
+    /* === Левая панель === */
+    #controls {
+      overflow-y: auto;           /* скролл при переполнении */
+    }
+    #controls .mb-3 { width:100%; }
+    #controls label {
+      display:block;
+      margin-bottom:.25rem;
+      font-weight:500;
+    }
+/* новое: растягиваем только text, number, range и color */
+#controls select,
+#controls input[type="text"],
+#controls input[type="number"],
+#controls input[type="range"],
+#controls input[type="color"] {
+  width:100%;
+}
+    /* Скрываем исходный file-input */
+    #controls input#upload {
+      display:none;
+    }
+    /* Project-info */
+    #project-info { margin-bottom:1rem; }
+    #project-info .form-label {
+      font-size:.8rem;
+      margin-bottom:.25rem;
+    }
+    #project-name {
+      font-size:.9rem;
+      background:#2a2a2a;
+      color:#fff;
+      padding:.375rem .75rem;
+      border:1px solid #444;
+      border-radius:.25rem;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    /* Мелкие метки и компактные поля */
+    .bg-dark .form-label.small { font-size:.8rem; }
+    .bg-dark .form-control-sm {
+      font-size:.85rem;
+      padding:.25rem .5rem;
+    }
+    /* Тёмные поля ввода */
+    .bg-dark .form-control,
+    .bg-dark .form-control-sm,
+    .bg-dark select.form-control {
+      background:#2a2a2a !important;
+      color:#fff !important;
+      border:1px solid #444 !important;
+    }
+    .bg-dark .form-control::placeholder {
+      color:#bbb !important;
+    }
+    .bg-dark input[type="color"] {
+      padding:0; height:2rem;
+      background:#2a2a2a;
+      border:1px solid #444;
+    }
+    /* Узкие серые слайдеры */
+    .bg-dark input[type=range] {
+      -webkit-appearance:none;
+      width:100%; height:6px;
+      background:#555;
+      border-radius:3px;
+      margin:.5rem 0;
+    }
+    .bg-dark input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance:none;
+      width:10px; height:10px;
+      background:#ccc;
+      border-radius:50%;
+      cursor:pointer;
+    }
+    .bg-dark input[type=range]::-moz-range-track {
+      background:#555; height:6px; border-radius:3px;
+    }
+    .bg-dark input[type=range]::-moz-range-thumb {
+      width:10px; height:10px;
+      background:#ccc; border-radius:50%;
+      cursor:pointer;
+    }
+    .bg-dark input[type=range]::-ms-thumb {
+      width:10px; height:10px;
+      background:#ccc; border-radius:50%;
+      cursor:pointer;
+    }
+    .bg-dark input[type=range]::-ms-track {
+      width:100%; height:6px;
+      background:transparent; border-color:transparent; color:transparent;
+    }
+    .bg-dark input[type=range]::-ms-fill-lower,
+    .bg-dark input[type=range]::-ms-fill-upper {
+      background:#555; border-radius:3px;
+    }
+    /* Убираем тень у фокуса аккордеона */
+    .bg-dark .accordion-button:focus {
+      box-shadow: none;
+    }
+
+    /* Видео + текст-оверлей */
+    #video-container {
+      position:relative;
+      text-align:center;
+      overflow: hidden;
+    }
+#overlay-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  white-space: nowrap; /* Убираем перенос строки */
+  max-width: 100%; /* Ограничиваем ширину текста */
+  overflow: hidden; /* Скрываем текст, выходящий за границы */
+  z-index: 2;
+  pointer-events: none;
+}
+    .navbar.bg-dark {
+      background-color: #1a1a1a !important;
+    }
+
+    /* Стили кнопок-тогглеров */
+    .bg-dark .btn[data-bs-toggle="collapse"].collapsed,
+    .bg-dark .btn[data-bs-toggle="collapse"]:not(.collapsed) {
+      background-color: #2a2a2a;
+      border:1px solid #444;
+      color:#fff;
+      text-align:left;
+      font-weight:500;
+    }
+
+    /* Стили для collapse-контента и анимации */
+    .bg-dark .collapse,
+    .bg-dark .collapsing {
+      background-color: #303030;
+      border:1px solid #444;
+      border-radius:4px;
+      padding:.5rem;
+      margin-bottom:1rem;
+      overflow:hidden;
+      transition: height 0.10s ease-out !important;
+    }
+/* Сбросим все предыдущие сбросы и явно зададим стиль чекбокса */
+.bg-dark input[type="checkbox"] {
+  /* размер */
+  width: 20px !important;
+  height: 20px !important;
+  /* дефолтный внешний вид отключаем */
+  -webkit-appearance: none;
+  appearance: none;
+  /* рамка и фон */
+  border: 2px solid #ccc;
+  border-radius: 3px;
+  background-color: transparent;
+  /* выровняем по тексту */
+  vertical-align: middle;
+  margin-right: .75rem;
+  cursor: pointer;
+  position: relative;
+}
+
+/* галочка при checked */
+.bg-dark input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  width: 6px;
+  height: 12px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+
+.noUi-target       { background: #444; }
+.noUi-connect      { background: #1a1a1a; }
+.noUi-handle       { background: #fff; border-color: #1e90ff; }
+.noUi-handle:hover { border-color: #63b3ed; }
+
+#apply {
+  background-color: #2a2a2a !important;
+  border-color:     #444    !important;
+  color:            #fff    !important;
+}
+
+/* Немного подсветки при наведении */
+#apply:hover,
+#apply:focus {
+  background-color: #3a3a3a !important;
+  border-color:     #555    !important;
+}
+
+/* Подсветка при наведении и фокусе на всех Collapse-кнопках */
+.btn[data-bs-toggle="collapse"]:hover,
+.btn[data-bs-toggle="collapse"]:focus {
+  background-color: #3a3a3a !important;
+  border-color:     #555    !important;
+}
+.navbar,
+#controls,
+.col.bg-dark {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+
+#preview-controls button {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+}
+
+/* === Стили для кастомного Preview Controls === */
+#preview-controls {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+/* Кнопки — тот же серый «secondary» с вашими hover/active */
+#preview-controls .btn-secondary {
+  background-color: #2a2a2a;
+  border-color:     #444;
+  color:            #fff;
+}
+#preview-controls .btn-secondary:hover,
+#preview-controls .btn-secondary:focus {
+  background-color: #3a3a3a !important;
+  border-color:     #555    !important;
+}
+/* 1. Базовый reset для всей «дорожки» */
+.bg-dark input[type="range"],
+.bg-dark input.form-range {
+  -webkit-appearance: none !important;
+  width: 100% !important;
+  height: 6px !important;
+  background: #555 !important;
+  border-radius: 3px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 2. Сегмент трека для WebKit-браузеров */
+.bg-dark input[type="range"]::-webkit-slider-runnable-track,
+.bg-dark input.form-range::-webkit-slider-runnable-track {
+  background: #555 !important;
+  height: 6px !important;
+  border-radius: 3px !important;
+}
+
+/* 3. «Ползунок» (thumb) для WebKit */
+.bg-dark input[type="range"]::-webkit-slider-thumb,
+.bg-dark input.form-range::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  background: #ccc !important;
+  margin-top: -2px !important;
+  cursor: pointer !important;
+}
+
+/* 4. Firefox */
+.bg-dark input[type="range"]::-moz-range-track,
+.bg-dark input.form-range::-moz-range-track {
+  background: #555 !important;
+  height: 6px !important;
+  border-radius: 3px !important;
+}
+.bg-dark input[type="range"]::-moz-range-thumb,
+.bg-dark input.form-range::-moz-range-thumb {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  background: #ccc !important;
+  cursor: pointer !important;
+}
+
+/* 5. IE / Edge */
+.bg-dark input[type="range"]::-ms-track,
+.bg-dark input.form-range::-ms-track {
+  background: transparent !important;
+  border-color: transparent !important;
+  height: 6px !important;
+}
+.bg-dark input[type="range"]::-ms-fill-lower,
+.bg-dark input.form-range::-ms-fill-lower,
+.bg-dark input[type="range"]::-ms-fill-upper,
+.bg-dark input.form-range::-ms-fill-upper {
+  background: #555 !important;
+  border-radius: 3px !important;
+}
+.bg-dark input[type="range"]::-ms-thumb,
+.bg-dark input.form-range::-ms-thumb {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 50% !important;
+  background: #ccc !important;
+  cursor: pointer !important;
+}
+
+#preview-controls .bi {
+  font-size: 1rem;      /* размер иконки */
+  color: #FFF;  /* наследует цвет кнопки */
+}
+
+
+/* Контейнер под видео-превью: 16:9, тёмный фон */
+#preview-wrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: #1a1a1a;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+/* Скрываем элементы управления, если хотите полностью свой UI */
+#preview-wrapper video {
+  /* уберите строку ниже, если вам нужны встроенные controls */
+  controls: hidden;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  /* опционально: слегка размыть задний фон */
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+}
+
+/* Спиннер поверх preview-блока */
+#preview-wrapper {
+  position: relative; /* уже есть, но на всякий случай */
+}
+#preview-wrapper .preview-spinner {
+  position: absolute;
+  inset: 0;                     /* топ:0;лево:0;право:0;низ:0; */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0,0,0,0.5);
+  z-index: 10;
+}
+
+/* полосатая анимация загрузки на кнопке */
+@keyframes stripe {
+  0%   { background-position: 0 0; }
+  100% { background-position: 40px 0; }
+}
+
+/* когда начнётся загрузка — добавляем этот класс */
+#download.loading {
+  position: relative;
+  overflow: hidden;
+  color: #fff !important; /* чтобы текст был сверху */
+}
+
+/* полоса-подложка */
+#download.loading::before {
+  content: '';
+  position: absolute;
+  top:    0;
+  left:   0;
+  width:  100%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(0,128,0,0.3) 25%, transparent       25%, transparent       50%, rgba(0,128,0,0.3) 50%, rgba(0,128,0,0.3) 75%, transparent       75%
+  );
+  background-size: 40px 40px;
+  animation: stripe 1s linear infinite;
+  z-index: 0;
+}
+
+/* текст при этом остаётся сверху */
+#download.loading > span {
+  position: relative;
+  z-index: 1;
+}
+
+/* 1. Убедимся, что у кнопки есть отступ справа под стрелочки */
+.btn[data-bs-toggle="collapse"] {
+  position: relative;
+  padding-right: 2rem; /* место под >> */
+}
+
+/* 2. Вставляем символы >> через псевдоэлемент */
+.btn[data-bs-toggle="collapse"]::after {
+  content: ">";
+  position: absolute;
+  right: 1rem;         /* отступ от правого края кнопки */
+  top: 50%;
+  transform: translateY(-50%) rotate(0deg);
+  transition: transform .3s ease; /* плавная анимация поворота */
+}
+
+/* 3. При раскрытии (aria-expanded="true") поворачиваем на 90° */
+.btn[data-bs-toggle="collapse"][aria-expanded="true"]::after {
+  transform: translateY(-50%) rotate(90deg);
+}
+  </style>
+</head>
+<body>
+  <!-- Навигация -->
+  <nav class="navbar navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand">
+        <img src="static/logo.svg" alt="Logo">
+        Видеоредактор
+      </a>
+    </div>
+  </nav>
+
+  <div id="entryOverlay" class="overlay d-flex align-items-center justify-content-center">
+    <div class="card bg-dark text-light text-center" style="width:320px; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+      <div class="card-body">
+        <i class="bi bi-file-earmark-play" style="font-size:2rem; color:#0d6efd;"></i>
+        <h5 class="card-title mt-2">Загрузите видео</h5>
+        <p class="card-text small text-secondary mb-3">
+          Перетащите файл сюда или
+        </p>
+        <!-- Скрытый инпут + стилизованная label-кнопка -->
+        <input type="file" id="entry-upload" accept="video/*" style="display:none">
+        <label for="entry-upload" class="btn btn-outline-light btn-sm">
+          Выбрать файл
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Основной контейнер -->
+  <div class="container-fluid h-100" style="margin-top:70px">
+    <div class="row h-100">
+
+      <!-- Левая панель: независимые Collapse-панели -->
+      <div id="controls" class="col bg-dark text-light p-3">
+        <!-- скрытый upload + info -->
+        <input type="file" id="upload" accept="video/*">
+        <div id="project-info" class="mt-2">
+          <label class="form-label"></label>
+          <div id="project-name">—</div>
+        </div>
+
+        <!-- Цветокоррекция -->
+        <button class="btn btn-secondary w-100 mb-2 text-start"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseColor"
+                aria-expanded="false">
+          Цветокоррекция
+        </button>
+        <div id="collapseColor" class="collapse mb-3">
+          <div>
+            <label for="hue-slider" class="form-label small">Цветовой тон:</label>
+            <input type="range" id="hue-slider" min="-180" max="180" value="0">
+          </div>
+          <div>
+            <label for="saturation-slider" class="form-label small">Насыщенность:</label>
+            <input type="range" id="saturation-slider" min="0" max="2" value="1" step="0.1">
+          </div>
+          <div>
+            <label for="contrast-slider" class="form-label small">Контрастность:</label>
+            <input type="range" id="contrast-slider" min="0" max="2" value="1" step="0.1">
+          </div>
+          <div>
+            <label for="brightness-slider" class="form-label small">Яркость:</label>
+            <input type="range" id="brightness-slider" min="0" max="2" value="1" step="0.1">
+          </div>
+        </div>
+        <!-- Текст -->
+        <button class="btn btn-secondary w-100 mb-2 text-start"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseText"
+                aria-expanded="false">
+          Текст
+        </button>
+        <div id="collapseText" class="collapse mb-3">
+          <div>
+            <label for="text-input" class="form-label small mb-1">Текст:</label>
+            <input type="text"
+                   id="text-input"
+                   class="form-control form-control-sm"
+                   placeholder="Введите текст"
+                   maxlength="11">
+          </div>
+          <div class="row gx-2 mb-2">
+            <div class="col">
+              <label for="text-size" class="form-label small">Размер</label>
+              <input type="number"
+                     id="text-size"
+                     class="form-control form-control-sm"
+                     value="24"
+                     max="360">
+            </div>
+            <div class="col">
+              <label for="text-color" class="form-label small">Цвет</label>
+              <input type="color"
+                     id="text-color"
+                     class="form-control form-control-sm p-1"
+                     value="#ffffff">
+            </div>
+            <div class="col">
+              <label for="font-select" class="form-label small">Шрифт</label>
+              <select id="font-select"
+                      class="form-control form-control-sm">
+                <option>Arial</option>
+                <option>Roboto</option>
+                <option>Times New Roman</option>
+              </select>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label for="text-position-x" class="form-label small">Позиция X:</label>
+            <input type="range" id="text-position-x" min="0" max="100" value="50">
+          </div>
+          <div>
+            <label for="text-position-y" class="form-label small">Позиция Y:</label>
+            <input type="range" id="text-position-y" min="0" max="100" value="50">
+          </div>
+        </div>
+
+        <!-- Эффекты -->
+        <button class="btn btn-secondary w-100 mb-2 text-start"
+                data-bs-toggle="collapse"
+                data-bs-target="#collapseEffects"
+                aria-expanded="false">
+          Эффекты
+        </button>
+        <div id="collapseEffects" class="collapse mb-3">
+          <div class="mb-3">
+            <label for="effect-blur" class="form-label small">Blur:</label>
+            <input type="range" id="effect-blur" min="0" max="10" value="0">
+          </div>
+          <div class="mb-3 d-flex align-items-center flex-wrap">
+            <label for="effect-grayscale"
+                   class="form-label small mb-0 me-2 text-nowrap">
+              Чёрно-белый:
+            </label>
+            <input type="checkbox"
+                   id="effect-grayscale"
+                   class="form-check-input me-4 w-auto">
+          
+            <label for="effect-invert"
+                   class="form-label small mb-0 me-2 text-nowrap">
+              Инверсия:
+            </label>
+            <input type="checkbox"
+                   id="effect-invert"
+                   class="form-check-input w-auto">
+          </div>
+      </div>
+    </div>
+
+      <!-- Центр: видео + таймлайн -->
+      <div class="col-6 d-flex flex-column align-items-center">
+        <div id="video-container" class="d-none" style="position:relative; display:inline-block; margin-top: 25px;">
+          <video id="video" controls style="max-width:100%; height:auto;"></video>
+          <div id="overlay-text"></div>
+        </div>
+        <div id="timeline" class="mt-5" style="width:97%;"></div>
+      </div>
+
+<!-- Правая панель: Превью + Аудио + Скачать -->
+<div class="col bg-dark p-3 d-flex flex-column h-100">
+
+  <!-- Group: Превью, видео и Audio -->
+  <div>
+    <button id="apply" class="btn btn-primary w-100 mt-2">Превью</button>
+
+    <!-- Обёртка для превью-видео с фиксированным соотношением 16:9 -->
+    <div id="preview-wrapper" class="mt-2 mb-2">
+      <video id="processed-video"
+             width="100%"
+             height="100%"
+             style="object-fit: contain;"
+             preload="metadata">
+        Ваш браузер не поддерживает видео.
+      </video>
+    </div>
+    <div id="preview-controls">
+    <div class="d-flex align-items-center mb-1 justify-content-center">
+      <button id="btn-back"    class="btn btn-secondary btn-sm me-1">
+        <i class="bi bi-skip-backward-fill"></i>
+      </button>
+      <button id="btn-play"    class="btn btn-secondary btn-sm me-1">
+        <i class="bi bi-play-fill"></i>
+      </button>
+      <button id="btn-forward" class="btn btn-secondary btn-sm me-2">
+        <i class="bi bi-skip-forward-fill"></i>
+      </button>
+    </div>
+    <!-- Ползунок Seek -->
+    <div class="mb-1">
+      <input
+        type="range"
+        id="preview-seek"
+        class="form-range me-2"
+        value="0" min="0" step="0.1"
+        style="flex:1">
+    </div>
+    
+    <!-- Громкость -->
+    <div class="d-flex justify-content-center align-items-center">
+      <button id="btn-mute" class="btn btn-sm btn-secondary me-2">
+        <i class="bi bi-volume-up-fill"></i>
+      </button>
+      <input
+        type="range"
+        id="preview-volume"
+        class="form-range"
+        min="0" max="1" step="0.01"
+        value="1"
+        style="width:100px">
+    </div>
+  </div>
+    <!-- Collapse-панель «Аудио» -->
+    <button class="btn btn-secondary w-100 mt-2 text-start"
+            data-bs-toggle="collapse"
+            data-bs-target="#collapseAudio"
+            aria-expanded="false">
+      Аудио
+    </button>
+    <div id="collapseAudio" class="collapse mt-2 mb-2">
+      <label for="volume-slider" class="form-label small text-white">
+        Громкость:
+      </label>
+      <input type="range"
+             id="volume-slider"
+             min="0"
+             max="2"
+             step="0.01"
+             value="1">
+    </div>
+    <button class="btn btn-secondary w-100 text-start mt-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#collapseRender"
+        aria-expanded="false">
+  Рендер
+</button>
+
+<!-- Содержимое панели «Рендер» -->
+<div id="collapseRender" class="collapse mt-2">
+  <!-- Формат контейнера -->
+  <div class="mb-2">
+    <label for="render-format" class="form-label small mb-1 text-white">
+      Формат:
+    </label>
+    <select id="render-format" class="form-control form-control-sm">
+      <option value="mp4">MP4 (H.264/AAC)</option>
+      <option value="webm">WebM (VP9/Opus)</option>
+      <option value="mkv">MKV (H.264/AAC)</option>
+    </select>
+  </div>
+
+  <!-- Разрешение -->
+  <div class="">
+    <label for="render-resolution" class="form-label small mb-1 text-white">
+      Разрешение:
+    </label>
+    <select id="render-resolution" class="form-control form-control-sm">
+      <option value="scale=1280:-2">HD</option>
+      <option value="scale=1920:-2">FullHD</option>
+      <option value="scale=3840:-2">4K</option>
+    </select>
+  </div>
+
+  <!-- Кнопка скачать внутри панели -->
+  <button id="download" class="btn btn-success w-100 mt-3">
+    <span>Скачать</span>
+  </button>
+</div>
+  </div>
+
+</div>
+  <!-- Bootstrap JS (для Collapse) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- noUiSlider JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/14.7.0/nouislider.min.js"></script>
+  <!-- Скрипт редактора -->
+  <script src="js/editor.js"></script>
+</body>
+</html>
